@@ -1,0 +1,67 @@
+version: "2"
+services:
+
+  reverse-proxy:
+    container_name: traefik
+    image: traefik
+    command: --api --docker
+    restart: always
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  platform:
+    container_name: platform
+    restart: always
+    build: ./platform
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    links:
+      - backend
+    labels:
+      - "traefik.frontend.rule=Host:abakus.local,dev.algorytmik.e1s.it"
+      
+  admin:
+    container_name: admin-panel
+    restart: always
+    build: ./admin-panel
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    links:
+      - backend
+    labels:
+      - "traefik.frontend.rule=Host:admin.abakus.local,admin.dev.algorytmik.e1s.it"
+      
+  backend:
+    container_name: backend-api
+    restart: always
+    build: ./backend-api
+    environment:
+      - MONGODB_PATH=mongo:27017/algorytmik
+      - JWT_SECRET=Algorytmik#2019
+      - PORT=3001
+    expose:
+      - "3001"
+    ports:
+      - "3001:3001"
+    links:
+      - mongo
+
+  mongo:
+    container_name: mongo
+    image: mongo
+    restart: always
+    volumes:
+      - ./data:/data/db
+    ports:
+      - "27017:27017"
+  
+  mongo-express:
+    container_name: mongo-express
+    image: mongo-express
+    restart: always
+    labels:
+      - "traefik.frontend.rule=Host:db.abakus.local,db.dev.algorytmik.e1s.it"
+      - "traefik.port=8081"
