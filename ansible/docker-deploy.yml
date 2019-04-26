@@ -1,0 +1,64 @@
+- hosts: dev
+  gather_facts: no
+  become: true
+  vars_files:
+    - vars.yml
+
+  tasks:
+  - name: install packages
+    yum:
+      name: "{{ packages }}"
+    vars:
+      packages:
+        - git
+        - epel-release
+        - python-pip
+    become: true
+      
+  - name: install docker packages
+    pip:
+      name: "{{ packages }}"
+    vars:
+      packages:
+        - docker
+        - docker-compose
+
+  - name: Install docker-compose
+    get_url:
+      url: "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-Linux-x86_64"
+      dest: /usr/local/bin/docker-compose
+      mode: 0777
+    become: true
+
+  - name: clone backend
+    git:
+      repo: 'https://{{ backend_gitlab_user | urlencode }}:{{ backend_gitlab_pass }}@edugitlab.e1s.it/Algorytmik/backend-api.git'
+      dest: /var/www/backend-api
+
+  - name: clone admin
+    git:
+      repo: 'https://{{ frontend_gitlab_user | urlencode }}:{{ frontend_gitlab_pass }}@edugitlab.e1s.it/Algorytmik/admin-panel.git'
+      dest: /var/www/admin-panel
+  
+  - name: clone platform
+    git:
+      repo: 'https://{{ platform_user | urlencode }}:{{ platform_pass }}@edugitlab.e1s.it/Algorytmik/Platform.git'
+      dest: /var/www/platform
+
+  - name: copy required files
+    copy: src={{ item.src }} dest={{ item.dest }}
+    with_items:
+      - { src: '../docker-compose.yml', dest: '/var/www' }
+      - { src: '../default.conf', dest: '/var/www' }
+
+  - name: clear docker build
+    docker_service:
+      project_src: '/var/www'
+      state: absent
+      build: yes
+      nocache: yes
+      
+  - name: docker service run
+    docker_service:
+      project_src: '/var/www'
+      state: present
